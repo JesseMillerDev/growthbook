@@ -41,6 +41,28 @@ export const numberFormatValidator = z.enum([
   "memory:kilobytes",
 ]);
 
+/**
+ * A column name that query generation emits unquoted (`m.<column>`), optionally
+ * a dotted path into a JSON column. Empty means unset, falling back to the
+ * default. Same shape `getTestQuery` requires before running a query.
+ */
+const mappedColumnNameValidator = z
+  .string()
+  .regex(
+    /^[\w.]*$/,
+    "Column names can only contain letters, numbers, underscores, and dots",
+  );
+
+export const timestampColumnField = mappedColumnNameValidator.describe(
+  'The column holding the event timestamp. Defaults to "timestamp" when unset.',
+);
+
+export const userIdColumnsField = z
+  .record(z.string(), mappedColumnNameValidator)
+  .describe(
+    'Maps an identifier type to the column holding it, for SQL that does not alias its columns to the identifier type names, e.g. `{"user_id": "userId"}`. May also be a field path into a JSON column (`properties.userId`) or the name of a virtual column. Identifier types without an entry use the identifier type name as the column name.',
+  );
+
 /** Persisted JSON fields: every field has a datatype (`""` until detected). */
 export const jsonColumnFieldsValidator = z.record(
   z.string(),
@@ -160,7 +182,9 @@ export const createFactTablePropsValidator = z
     tags: z.array(z.string()),
     datasource: z.string(),
     userIdTypes: z.array(z.string()),
+    userIdColumns: userIdColumnsField.optional(),
     sql: z.string(),
+    timestampColumn: timestampColumnField.optional(),
     eventName: z.string(),
     columns: z.array(createColumnPropsValidator).optional(),
     managedBy: z.enum(["", "api", "admin"]).optional(),
@@ -179,7 +203,9 @@ export const updateFactTablePropsValidator = z
     projects: z.array(z.string()).optional(),
     tags: z.array(z.string()).optional(),
     userIdTypes: z.array(z.string()).optional(),
+    userIdColumns: userIdColumnsField.optional(),
     sql: z.string().optional(),
+    timestampColumn: timestampColumnField.optional(),
     eventName: z.string().optional(),
     columns: z.array(createColumnPropsValidator).optional(),
     managedBy: z.enum(["", "api", "admin"]).optional(),
@@ -655,12 +681,14 @@ export const apiFactTableValidator = namedSchema(
       tags: z.array(z.string()),
       datasource: z.string(),
       userIdTypes: z.array(z.string()),
+      userIdColumns: userIdColumnsField.optional(),
       aggregatedFactTableSettings: aggregatedFactTableSettingsValidator
         .describe(
           "Settings for maintaining shared daily aggregated tables (a subset of userIdTypes plus the daily update time and restate lookback window) used to speed up CUPED. Requires the data pipeline (pipeline-mode) feature.",
         )
         .optional(),
       sql: z.string(),
+      timestampColumn: timestampColumnField.optional(),
       eventName: z
         .string()
         .describe("The event name used in SQL template variables")
@@ -808,12 +836,14 @@ const postFactTableBody = z
       .describe(
         'List of identifier columns in this table. For example, "id" or "anonymous_id"',
       ),
+    userIdColumns: userIdColumnsField.optional(),
     aggregatedFactTableSettings: aggregatedFactTableSettingsValidator
       .describe(
         "Settings for maintaining shared daily aggregated tables (a subset of userIdTypes plus the daily update time and restate lookback window) used to speed up CUPED. Requires the data pipeline (pipeline-mode) feature.",
       )
       .optional(),
     sql: z.string().describe("The SQL query for this fact table"),
+    timestampColumn: timestampColumnField.optional(),
     eventName: z
       .string()
       .describe("The event name used in SQL template variables")
@@ -852,12 +882,14 @@ const updateFactTableBody = z
         'List of identifier columns in this table. For example, "id" or "anonymous_id"',
       )
       .optional(),
+    userIdColumns: userIdColumnsField.optional(),
     aggregatedFactTableSettings: aggregatedFactTableSettingsValidator
       .describe(
         "Settings for maintaining shared daily aggregated tables (a subset of userIdTypes plus the daily update time and restate lookback window) used to speed up CUPED. Requires the data pipeline (pipeline-mode) feature.",
       )
       .optional(),
     sql: z.string().describe("The SQL query for this fact table").optional(),
+    timestampColumn: timestampColumnField.optional(),
     eventName: z
       .string()
       .describe("The event name used in SQL template variables")

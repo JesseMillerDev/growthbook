@@ -1106,6 +1106,16 @@ export function getFactTableTimestampColumn(
   return factTable?.timestampColumn || "timestamp";
 }
 
+// The column holding a given identifier type. Falls back to the id type name,
+// which is what a fact table's SQL is expected to alias its identifiers to when
+// there's no mapping.
+export function getFactTableIdColumn(
+  factTable: Pick<FactTableInterface, "userIdColumns">,
+  idType: string,
+): string {
+  return factTable.userIdColumns?.[idType] || idType;
+}
+
 // SQL expression for one of a fact table's identifier columns. Callers alias it
 // back to the id type, so nothing downstream has to know the real name. An
 // unmapped id type emits its own name exactly as before, keeping generated SQL
@@ -1123,8 +1133,8 @@ export function getFactTableIdColumnExpression(
     identifierQuote?: SqlIdentifierQuote;
   },
 ): string {
-  const column = factTable.userIdColumns?.[idType];
-  if (!column || column === idType) {
+  const column = getFactTableIdColumn(factTable, idType);
+  if (column === idType) {
     return alias ? `${alias}.${idType}` : idType;
   }
   // Goes through getColumnExpression so a virtual column or a JSON field path
@@ -1148,7 +1158,7 @@ export function getFactTableIdColumns(
     ...new Set(
       factTable.userIdTypes.flatMap((idType) => [
         idType,
-        factTable.userIdColumns?.[idType] || idType,
+        getFactTableIdColumn(factTable, idType),
       ]),
     ),
   ];
